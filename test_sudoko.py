@@ -75,19 +75,19 @@ class TestSudoko(unittest.TestCase):
         pass
 
     def test_basic1(self):
-        print "test_basic1"
+        print("test_basic1")
         s = sudoko(m1)
         s.solve()
         self.assertEqual(m1_s, s.solution())
 
     def test_basic2(self):
-        print "test_basic2"
+        print("test_basic2")
         s = sudoko(m2)
         s.solve()
         self.assertEqual(m2_s, s.solution())
 
     def test_austin(self):
-        print "test_austin"
+        print("test_austin")
         self.maxDiff = None
         s = sudoko(ma)
         s.solve()

@@ -47,15 +47,15 @@ class sudoko(object):
     def __print_candidates(self):
         k = 1
         for r in self.__candidates:
-            print k, "(1,2,3):" , r[0], r[1], r[2]
-            print k, "(4,5,6):" , r[3], r[4], r[5]
-            print k, "(7,8,9):" , r[6], r[7], r[8]
+            print(k, "(1,2,3):" , r[0], r[1], r[2])
+            print(k, "(4,5,6):" , r[3], r[4], r[5])
+            print(k, "(7,8,9):" , r[6], r[7], r[8])
             k += 1
 
 
     def __print_matrix(self):
         for row in self.__m:
-            print row
+            print(row)
 
 
     def __clean(self, rix, cix):
@@ -69,8 +69,8 @@ class sudoko(object):
             if value in self.__candidates[rix][col]:
                 self.__candidates[rix][col].remove(value)
 
-        ri = 3*(rix/3)
-        ci = 3*(cix/3)
+        ri = 3*(rix//3)
+        ci = 3*(cix//3)
         for r in [ri, ri+1, ri+2]:
             for c in [ci, ci+1, ci+2]:
                 if value in self.__candidates[r][c]:
@@ -81,7 +81,7 @@ class sudoko(object):
         self.__m[rix][cix] = solution
         # remove all candidates from this cell
         self.__candidates[rix][cix]=[]
-        print "Solved",text,":", rix+1, cix+1, ":",  self.__m[rix][cix]
+        print("Solved", text, ":", rix+1, cix+1, ":", self.__m[rix][cix])
         self.__solvedsomething = True
         self.__clean(rix, cix)
 
@@ -154,8 +154,8 @@ class sudoko(object):
                 if self.__m[row][col] != 0:
                     # the cell is solved
                     # check if we can remove candidates in the cells square
-                    ri = 3*(row/3)
-                    ci = 3*(col/3)
+                    ri = 3*(row//3)
+                    ci = 3*(col//3)
                     for r in [ri, ri+1, ri+2]:
                         for c in [ci, ci+1, ci+2]:
                             if r == row and c == col:
@@ -178,8 +178,8 @@ class sudoko(object):
                 if e == 0:
                     l = self.__candidates[rix][cix]
                     for i in l:
-                        ri = 3*(rix/3)
-                        ci = 3*(cix/3)
+                        ri = 3*(rix//3)
+                        ci = 3*(cix//3)
                         inst = 0
                         for r in [ri, ri+1, ri+2]:
                             for c in [ci, ci+1, ci+2]:
@@ -208,8 +208,8 @@ class sudoko(object):
                         continue
                     for i in candidates:
                         # find the local square
-                        ri = 3*(rix/3)
-                        ci = 3*(cix/3)
+                        ri = 3*(rix//3)
+                        ci = 3*(cix//3)
                         block = []
                         # Collect all local cells with same candidate i
                         for r in [ri, ri+1, ri+2]:
@@ -274,16 +274,16 @@ class sudoko(object):
                             lock.append(ro)
                     # Check if only two and in same column and square
                     if len(lock) == 2:
-                        if lock[0]/3 == lock[1]/3:
+                        if lock[0]//3 == lock[1]//3:
                             # Found two in same column and square
                             lock.sort()
                             row = oneinthree[tuple(lock)]
                             for c in complete0:
-                                if c/3 == cix/3:
+                                if c//3 == cix//3:
                                     if i in self.__candidates[row][c]:
                                         self.__candidates[row][c].remove(i)
                                         self.__solvedsomething = True
-                                        print "Lock row removal", row, c, i
+                                        print("Lock row removal", row, c, i)
 
                 candidates = self.__candidates[rix][cix]
                 for i in candidates:
@@ -293,16 +293,16 @@ class sudoko(object):
                             lock.append(co)
                     # Check if only two and in same row and square
                     if len(lock) == 2:
-                        if lock[0]/3 == lock[1]/3:
+                        if lock[0]//3 == lock[1]//3:
                             # Found two in same row and square
                             lock.sort()
                             column = oneinthree[tuple(lock)]
                             for r in complete0:
-                                if r/3 == rix/3:
+                                if r//3 == rix//3:
                                     if i in self.__candidates[r][column]:
                                         self.__candidates[r][column].remove(i)
                                         self.__solvedsomething = True
-                                        print "Lock column removal", r, column, i
+                                        print("Lock column removal", r, column, i)
 
     def __cellsleft(self):
         remaining = 0
@@ -323,7 +323,7 @@ class sudoko(object):
         while self.__solvedsomething:
             self.__solvedsomething = False
             cnt += 1
-            print "iteration:", cnt
+            print("iteration:", cnt)
             self.__rowandcolumnelimination()
             self.__rowelimination()
             self.__columnelimination()
@@ -332,17 +332,17 @@ class sudoko(object):
             self.__blocking()
             self.__lock()
             remaining = self.__cellsleft()
-            print "Remaining cells:", remaining
+            print("Remaining cells:", remaining)
             if remaining == 0:
                 break
 
         stop = datetime.now()
         if remaining != 0:
-            print "Failed to solve Sudoko", cnt, "iteration(s) in", stop-start
+            print("Failed to solve Sudoko", cnt, "iteration(s) in", stop-start)
             self.__print_candidates()
             self.__print_matrix()
         else:
-            print "Solved Sudoko using", cnt, "iteration(s) in", stop-start
+            print("Solved Sudoko using", cnt, "iteration(s) in", stop-start)
 
     def printit(self):
         self.__print_matrix()
