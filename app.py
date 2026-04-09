@@ -1,4 +1,5 @@
 import io
+import re
 import sys
 from flask import Flask, render_template, request, jsonify
 from sudoko import sudoko
@@ -28,16 +29,22 @@ def index():
 def solve():
     puzzle = request.get_json().get("puzzle")
     s = sudoko(puzzle)
-    # suppress solver's stdout chatter
+    # Capture stdout to extract the order cells were solved
     old_stdout = sys.stdout
-    sys.stdout = io.StringIO()
+    sys.stdout = captured = io.StringIO()
     try:
         s.solve()
     finally:
         sys.stdout = old_stdout
     sol = s.solution()
     solved = all(sol[r][c] != 0 for r in range(9) for c in range(9))
-    return jsonify({"solution": sol, "solved": solved})
+    # Parse lines like: "Solved row elimination : 3 7 : 5"
+    order = []
+    for line in captured.getvalue().splitlines():
+        m = re.match(r"Solved .+ : (\d+) (\d+) : \d+", line)
+        if m:
+            order.append([int(m.group(1)) - 1, int(m.group(2)) - 1])
+    return jsonify({"solution": sol, "solved": solved, "order": order})
 
 
 @app.route("/parse-image", methods=["POST"])
@@ -57,4 +64,5 @@ def parse_image():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
