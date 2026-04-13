@@ -27,6 +27,13 @@
       color: #888;
     }
 
+    /* ── main layout: grid + preview side by side ─────────── */
+    #layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 32px;
+    }
+
     /* ── grid ─────────────────────────────────────────────── */
     #grid {
       display: grid;
@@ -51,19 +58,18 @@
       -moz-appearance: textfield;
       appearance: textfield;
       cursor: text;
-      transition: background 0.15s;
+      transition: background 0.2s, color 0.2s, opacity 0.2s;
     }
     #grid input::-webkit-outer-spin-button,
     #grid input::-webkit-inner-spin-button { -webkit-appearance: none; }
 
-    /* thick borders at box boundaries (right/bottom of col 3,6 and row 3,6) */
+    /* thick borders at box boundaries */
     #grid input:nth-child(9n+3),
     #grid input:nth-child(9n+6) { border-right: 2px solid #555; }
 
     #grid input:nth-child(n+19):nth-child(-n+27),
     #grid input:nth-child(n+46):nth-child(-n+54) { border-bottom: 2px solid #555; }
 
-    /* right and bottom outer border */
     #grid input:nth-child(9n)   { border-right:  2px solid #555; }
     #grid input:nth-child(n+73) { border-bottom: 2px solid #555; }
 
@@ -76,8 +82,26 @@
     }
     #grid input.solved { background: #edf7ee; color: #2e7d32; }
     #grid input.stuck  { background: #fdf1f0; color: #c62828; }
-
     #grid input:focus:not(.given) { background: #f0f4ff; }
+
+    /* solving animation — pulse empty cells */
+    @keyframes cell-pulse {
+      0%, 100% { background: #fff; }
+      50%       { background: #f5f5f5; }
+    }
+    #grid.solving input:not(.given):not(.solved):not(.stuck) {
+      animation: cell-pulse 0.9s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* reveal animation for newly solved cells */
+    @keyframes cell-reveal {
+      from { opacity: 0; background: #d4edda; }
+      to   { opacity: 1; background: #edf7ee; }
+    }
+    #grid input.reveal {
+      animation: cell-reveal 0.35s ease-out forwards;
+    }
 
     /* ── buttons ──────────────────────────────────────────── */
     #controls {
@@ -98,14 +122,16 @@
       border-bottom: 1px solid transparent;
       transition: color 0.15s, border-color 0.15s;
     }
-    button:hover { color: #111; border-bottom-color: #111; }
+    button:hover  { color: #111; border-bottom-color: #111; }
+    button:disabled { color: #ccc; cursor: default; border-bottom-color: transparent; }
 
-    /* ── image upload ────────────────────────────────────── */
+    /* ── image preview panel ──────────────────────────────── */
     #upload-area {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      width: 320px;
     }
 
     #upload-label {
@@ -119,17 +145,20 @@
       transition: color 0.15s, border-color 0.15s;
     }
     #upload-label:hover { color: #111; border-bottom-color: #111; }
-
     #upload-input { display: none; }
 
     #preview {
-      max-width: 160px;
-      max-height: 160px;
+      width: 320px;
+      height: 320px;
       object-fit: contain;
       display: none;
-      border: 1px solid #ddd;
+      border: 1px solid #e0e0e0;
+      background: #fafafa;
+      transition: opacity 0.3s;
     }
+    #preview.visible { display: block; }
 
+    /* ── status message ───────────────────────────────────── */
     #msg {
       font-size: 0.8rem;
       letter-spacing: 0.05em;
@@ -144,7 +173,15 @@
 
   <h1>Sudoku</h1>
 
-  <div id="grid"></div>
+  <div id="layout">
+    <div id="grid"></div>
+
+    <div id="upload-area">
+      <label id="upload-label" for="upload-input">Import image</label>
+      <input id="upload-input" type="file" accept="image/*">
+      <img id="preview" alt="puzzle preview">
+    </div>
+  </div>
 
   <div id="controls">
     <button id="btn-solve">Solve</button>
@@ -152,22 +189,15 @@
     <button id="btn-clear">Clear</button>
   </div>
 
-  <div id="upload-area">
-    <label id="upload-label" for="upload-input">Import image</label>
-    <input id="upload-input" type="file" accept="image/*">
-    <img id="preview" alt="puzzle preview">
-  </div>
-
   <div id="msg"></div>
 
   <script>
     const DEFAULT = {{ default_puzzle | tojson }};
 
-    const grid    = document.getElementById("grid");
-    const msg     = document.getElementById("msg");
-    const inputs  = [];
+    const grid   = document.getElementById("grid");
+    const msg    = document.getElementById("msg");
+    const inputs = [];
 
-    // build 81 inputs
     for (let i = 0; i < 81; i++) {
       const inp = document.createElement("input");
       inp.type = "text";
@@ -202,7 +232,7 @@
         for (let c = 0; c < 9; c++) {
           const inp = inputs[r * 9 + c];
           const val = puzzle[r][c];
-          inp.classList.remove("given", "solved", "stuck");
+          inp.classList.remove("given", "solved", "stuck", "reveal");
           inp.readOnly = false;
           if (val) {
             inp.value = val;
@@ -229,6 +259,12 @@
     async function solve() {
       setMsg("");
       const puzzle = getMatrix();
+      const btnSolve = document.getElementById("btn-solve");
+
+      // Start solving animation
+      grid.classList.add("solving");
+      btnSolve.disabled = true;
+
       let data;
       try {
         const res = await fetch("/solve", {
@@ -238,30 +274,65 @@
         });
         data = await res.json();
       } catch {
+        grid.classList.remove("solving");
+        btnSolve.disabled = false;
         setMsg("Server error.", "err");
         return;
       }
 
-      const sol = data.solution;
+      grid.classList.remove("solving");
+      btnSolve.disabled = false;
+
+      const sol  = data.solution;
       const orig = getMatrix();
-      for (let r = 0; r < 9; r++) {
-        for (let c = 0; c < 9; c++) {
-          const inp = inputs[r * 9 + c];
-          if (inp.classList.contains("given")) continue;
-          const v = sol[r][c];
-          inp.value = v || "";
-          inp.classList.remove("solved", "stuck");
-          if (v && !orig[r][c])      inp.classList.add("solved");
-          else if (!v && !orig[r][c]) inp.classList.add("stuck");
+
+      // Build a map of solved cells keyed by "r,c" for quick lookup
+      const solvedMap = {};
+      for (let r = 0; r < 9; r++)
+        for (let c = 0; c < 9; c++)
+          if (sol[r][c] && !orig[r][c] && !inputs[r*9+c].classList.contains("given"))
+            solvedMap[`${r},${c}`] = sol[r][c];
+
+      // Reveal in the order the algorithm actually solved them
+      const order = data.order || [];
+      const seen  = new Set();
+      const sequence = [];
+
+      for (const [r, c] of order) {
+        const key = `${r},${c}`;
+        if (solvedMap[key] && !seen.has(key)) {
+          sequence.push({ inp: inputs[r*9+c], v: solvedMap[key] });
+          seen.add(key);
         }
       }
-      setMsg(data.solved ? "Solved." : "Could not fully solve.", data.solved ? "ok" : "err");
+      // Append any stuck cells (unsolved) at the end without animation
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          const inp = inputs[r*9+c];
+          if (inp.classList.contains("given")) continue;
+          inp.classList.remove("solved", "stuck", "reveal");
+          if (!sol[r][c] && !orig[r][c]) inp.classList.add("stuck");
+        }
+      }
+
+      sequence.forEach(({ inp, v }, i) => {
+        setTimeout(() => {
+          inp.value = v;
+          inp.classList.add("solved", "reveal");
+          inp.addEventListener("animationend", () => inp.classList.remove("reveal"), { once: true });
+        }, i * 40);
+      });
+
+      const delay = sequence.length * 40 + 50;
+      setTimeout(() => {
+        setMsg(data.solved ? "Solved." : "Could not fully solve.", data.solved ? "ok" : "err");
+      }, delay);
     }
 
     function clear() {
       setMsg("");
       inputs.forEach(inp => {
-        inp.classList.remove("given", "solved", "stuck");
+        inp.classList.remove("given", "solved", "stuck", "reveal");
         inp.readOnly = false;
         inp.value = "";
       });
@@ -272,7 +343,7 @@
       msg.className = cls || "";
     }
 
-    // ── image import ────────────────────────────────────────
+    // ── image import ─────────────────────────────────────────
     const uploadInput = document.getElementById("upload-input");
     const preview     = document.getElementById("preview");
 
@@ -280,9 +351,8 @@
       const file = uploadInput.files[0];
       if (!file) return;
 
-      // show thumbnail
       preview.src = URL.createObjectURL(file);
-      preview.style.display = "block";
+      preview.classList.add("visible");
 
       setMsg("Reading image…");
       const fd = new FormData();
